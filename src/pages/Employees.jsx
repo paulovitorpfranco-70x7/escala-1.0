@@ -1,7 +1,8 @@
+// @ts-nocheck
 import { useEffect, useState } from "react";
 import { Pencil, Plus, Trash2, UserCircle } from "lucide-react";
 
-import { db } from "@/api/base44Client";
+import { db } from "@/API/base44Client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

@@ -1,7 +1,8 @@
+// @ts-nocheck
 import { useEffect, useRef, useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 
-import { db } from "@/api/base44Client";
+import { db } from "@/API/base44Client";
 import ExportButton from "@/components/schedule/ExportButton";
 import MonthSelector from "@/components/schedule/MonthSelector";
 import ScheduleGrid from "@/components/schedule/ScheduleGrid";

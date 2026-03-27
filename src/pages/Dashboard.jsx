@@ -8,7 +8,7 @@ import {
   Users,
 } from "lucide-react";
 
-import { db } from "@/api/base44Client";
+import { db } from "@/API/base44Client";
 import { getMonthName } from "@/lib/scheduleUtils";
 
 export default function Dashboard() {

@@ -19,7 +19,7 @@
   "include": [
     "src/App.jsx",
     "src/main.jsx",
-    "src/api/**/*",
+    "src/API/**/*",
     "src/components/**/*",
     "src/lib/**/*",
     "src/pages/**/*"

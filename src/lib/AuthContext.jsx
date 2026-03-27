@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
-import { db, isFallbackDb } from "@/api/base44Client";
+import { db, isFallbackDb } from "@/API/base44Client";
 import { appParams } from "@/lib/app-params";
 
 const AuthContext = createContext(null);
