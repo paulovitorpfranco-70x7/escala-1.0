@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -9,6 +10,8 @@ import {
 } from "lucide-react";
 
 import { db } from "@/API/base44Client";
+import { Button } from "@/components/ui/button";
+import PageState from "@/components/ui/page-state";
 import { getMonthName } from "@/lib/scheduleUtils";
 
 export default function Dashboard() {
@@ -16,32 +19,38 @@ export default function Dashboard() {
   const [schedules, setSchedules] = useState([]);
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const [employeeList, scheduleList, ruleList] = await Promise.all([
-          db.entities.Employee.list(),
-          db.entities.Schedule.filter({
-            month: currentMonth,
-            year: currentYear,
-          }),
-          db.entities.ScheduleRule.list(),
-        ]);
+  async function loadDashboard() {
+    setLoading(true);
 
-        setEmployees(employeeList);
-        setSchedules(scheduleList);
-        setRules(ruleList);
-      } finally {
-        setLoading(false);
-      }
+    try {
+      setLoadError("");
+      const [employeeList, scheduleList, ruleList] = await Promise.all([
+        db.entities.Employee.list(),
+        db.entities.Schedule.filter({
+          month: currentMonth,
+          year: currentYear,
+        }),
+        db.entities.ScheduleRule.list(),
+      ]);
+
+      setEmployees(employeeList);
+      setSchedules(scheduleList);
+      setRules(ruleList);
+    } catch (error) {
+      setLoadError(error?.message || "Nao foi possivel carregar o painel.");
+    } finally {
+      setLoading(false);
     }
+  }
 
-    void load();
+  useEffect(() => {
+    void loadDashboard();
   }, [currentMonth, currentYear]);
 
   const totalFolgas = schedules.reduce((sum, schedule) => {
@@ -80,14 +89,8 @@ export default function Dashboard() {
       link: "/escala",
     },
   ];
-
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
-      </div>
-    );
-  }
+  const isEmpty =
+    employees.length === 0 && schedules.length === 0 && rules.length === 0;
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -100,75 +103,117 @@ export default function Dashboard() {
           {currentYear}
         </p>
       </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Link
-            key={stat.label}
-            className="group rounded-xl border border-border bg-card p-5 transition-all duration-300 hover:border-primary/20 hover:shadow-lg"
-            to={stat.link}
-          >
-            <div className="flex items-center justify-between">
-              <div
-                className={`flex h-10 w-10 items-center justify-center rounded-lg ${stat.color}`}
+      {loading ? (
+        <PageState
+          description="Buscando indicadores e atalhos do periodo atual."
+          state="loading"
+          title="Carregando painel"
+        />
+      ) : loadError ? (
+        <PageState
+          action={
+            <Button
+              onClick={() => {
+                void loadDashboard();
+              }}
+            >
+              Tentar novamente
+            </Button>
+          }
+          description={loadError}
+          state="error"
+          title="Falha ao carregar painel"
+        />
+      ) : isEmpty ? (
+        <PageState
+          action={
+            <>
+              <Button asChild>
+                <Link to="/colaboradores">Cadastrar colaboradores</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/escala">Abrir escala</Link>
+              </Button>
+            </>
+          }
+          description="Cadastre colaboradores e gere a primeira escala para alimentar os indicadores do painel."
+          state="empty"
+          title="Painel sem dados iniciais"
+        />
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {stats.map((stat) => (
+              <Link
+                key={stat.label}
+                className="group rounded-xl border border-border bg-card p-5 transition-all duration-300 hover:border-primary/20 hover:shadow-lg"
+                to={stat.link}
               >
-                <stat.icon className="h-5 w-5" />
-              </div>
-              <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-            </div>
-            <div className="mt-4">
-              <p className="font-heading text-2xl font-bold text-foreground">
-                {stat.value}
-              </p>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {stat.label}
-              </p>
-            </div>
-          </Link>
-        ))}
-      </div>
+                <div className="flex items-center justify-between">
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-lg ${stat.color}`}
+                  >
+                    <stat.icon className="h-5 w-5" />
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                </div>
+                <div className="mt-4">
+                  <p className="font-heading text-2xl font-bold text-foreground">
+                    {stat.value}
+                  </p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {stat.label}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
 
-      <div className="rounded-xl border border-border bg-card p-6">
-        <h2 className="mb-4 font-heading text-lg font-semibold">
-          Acesso rapido
-        </h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Link
-            className="flex items-center gap-3 rounded-lg bg-primary/5 p-4 transition-colors hover:bg-primary/10"
-            to="/escala"
-          >
-            <Calendar className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-sm font-medium">Ver escala</p>
-              <p className="text-xs text-muted-foreground">
-                Visualizar e editar a escala do mes
-              </p>
+          <div className="rounded-xl border border-border bg-card p-6">
+            <h2 className="mb-4 font-heading text-lg font-semibold">
+              Acesso rapido
+            </h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Link
+                className="flex items-center gap-3 rounded-lg bg-primary/5 p-4 transition-colors hover:bg-primary/10"
+                to="/escala"
+              >
+                <Calendar className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">Ver escala</p>
+                  <p className="text-xs text-muted-foreground">
+                    Visualizar e editar a escala do mes
+                  </p>
+                </div>
+              </Link>
+              <Link
+                className="flex items-center gap-3 rounded-lg bg-accent/5 p-4 transition-colors hover:bg-accent/10"
+                to="/comandos"
+              >
+                <MessageSquare className="h-5 w-5 text-accent" />
+                <div>
+                  <p className="text-sm font-medium">Comandos IA</p>
+                  <p className="text-xs text-muted-foreground">
+                    Criar escala com texto natural
+                  </p>
+                </div>
+              </Link>
+              <Link
+                className="flex items-center gap-3 rounded-lg bg-purple-50 p-4 transition-colors hover:bg-purple-100"
+                to="/colaboradores"
+              >
+                <Users className="h-5 w-5 text-purple-700" />
+                <div>
+                  <p className="text-sm font-medium">Colaboradores</p>
+                  <p className="text-xs text-muted-foreground">
+                    Gerenciar equipe
+                  </p>
+                </div>
+              </Link>
             </div>
-          </Link>
-          <Link
-            className="flex items-center gap-3 rounded-lg bg-accent/5 p-4 transition-colors hover:bg-accent/10"
-            to="/comandos"
-          >
-            <MessageSquare className="h-5 w-5 text-accent" />
-            <div>
-              <p className="text-sm font-medium">Comandos IA</p>
-              <p className="text-xs text-muted-foreground">
-                Criar escala com texto natural
-              </p>
-            </div>
-          </Link>
-          <Link
-            className="flex items-center gap-3 rounded-lg bg-purple-50 p-4 transition-colors hover:bg-purple-100"
-            to="/colaboradores"
-          >
-            <Users className="h-5 w-5 text-purple-700" />
-            <div>
-              <p className="text-sm font-medium">Colaboradores</p>
-              <p className="text-xs text-muted-foreground">Gerenciar equipe</p>
-            </div>
-          </Link>
-        </div>
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

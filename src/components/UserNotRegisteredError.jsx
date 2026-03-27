@@ -1,4 +1,8 @@
+import { useAuth } from "@/lib/AuthContext";
+
 export default function UserNotRegisteredError() {
+  const { logout } = useAuth();
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-white to-slate-50">
       <div className="w-full max-w-md rounded-lg border border-slate-100 bg-white p-8 shadow-lg">
@@ -33,6 +37,12 @@ export default function UserNotRegisteredError() {
               <li>Saia e entre novamente.</li>
             </ul>
           </div>
+          <button
+            className="mt-6 inline-flex items-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+            onClick={() => logout(true)}
+          >
+            Sair desta conta
+          </button>
         </div>
       </div>
     </div>

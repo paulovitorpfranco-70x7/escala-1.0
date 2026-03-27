@@ -12,6 +12,7 @@ export default function ScheduleGrid({
   year,
   onCellClick,
   readonly = false,
+  isCellPending,
 }) {
   const totalDays = getDaysInMonth(month, year);
   const days = Array.from({ length: totalDays }, (_, index) => index + 1);
@@ -65,6 +66,7 @@ export default function ScheduleGrid({
               {days.map((day) => {
                 const shift = schedule.days?.[String(day)] || "T";
                 const weekend = isWeekend(day, month, year);
+                const cellPending = isCellPending?.(schedule.id, day) || false;
 
                 return (
                   <td
@@ -74,8 +76,9 @@ export default function ScheduleGrid({
                     }`}
                   >
                     <ShiftCell
+                      disabled={readonly || cellPending}
                       onClick={() => {
-                        if (!readonly) {
+                        if (!readonly && !cellPending) {
                           onCellClick?.(schedule, day);
                         }
                       }}

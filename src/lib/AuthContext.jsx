@@ -1,6 +1,12 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
-import { db, isFallbackDb } from "@/API/base44Client";
+import {
+  base44ServerUrl,
+  canRedirectToLogin,
+  db,
+  isBase44Configured,
+  isFallbackDb,
+} from "@/API/base44Client";
 import { appParams } from "@/lib/app-params";
 
 const AuthContext = createContext(null);
@@ -17,26 +23,97 @@ export function AuthProvider({ children }) {
     void checkAppState();
   }, []);
 
+  async function loadPublicSettings() {
+    const headers = {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-App-Id": String(appParams.appId),
+    };
+
+    if (appParams.token) {
+      headers.Authorization = `Bearer ${appParams.token}`;
+    }
+
+    const response = await fetch(
+      `${base44ServerUrl}/api/apps/public/prod/public-settings/by-id/${appParams.appId}`,
+      { headers }
+    );
+
+    if (!response.ok) {
+      let errorData = null;
+
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = null;
+      }
+
+      throw {
+        message: errorData?.message || "Failed to load app public settings",
+        status: response.status,
+        data: errorData,
+      };
+    }
+
+    return response.json();
+  }
+
+  function mapAuthError(error) {
+    const reason =
+      error?.data?.extra_data?.reason ||
+      error?.data?.reason ||
+      error?.reason ||
+      null;
+
+    if (reason === "user_not_registered") {
+      return {
+        type: "user_not_registered",
+        message: "User not registered for this app",
+      };
+    }
+
+    if (reason === "auth_required" || error?.status === 401 || error?.status === 403) {
+      return {
+        type: "auth_required",
+        message: error?.message || "Authentication required",
+      };
+    }
+
+    return {
+      type: "unknown",
+      message: error?.message || "Unable to load authentication state",
+    };
+  }
+
   async function checkAppState() {
     setAuthError(null);
     setIsLoadingPublicSettings(true);
     setIsLoadingAuth(true);
     setAppPublicSettings(null);
 
-    setIsLoadingPublicSettings(false);
+    if (!isBase44Configured || isFallbackDb) {
+      setUser(null);
+      setIsAuthenticated(false);
+      setIsLoadingPublicSettings(false);
+      setIsLoadingAuth(false);
+      return;
+    }
+
+    try {
+      const publicSettings = await loadPublicSettings();
+      setAppPublicSettings(publicSettings);
+      setIsLoadingPublicSettings(false);
+    } catch (error) {
+      setIsLoadingPublicSettings(false);
+      setIsLoadingAuth(false);
+      setAuthError(mapAuthError(error));
+      return;
+    }
 
     if (!appParams.token) {
       setUser(null);
       setIsAuthenticated(false);
       setIsLoadingAuth(false);
-
-      if (!isFallbackDb) {
-        setAuthError({
-          type: "auth_required",
-          message: "Authentication required",
-        });
-      }
-
       return;
     }
 
@@ -46,7 +123,7 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(Boolean(currentUser));
       setIsLoadingAuth(false);
 
-      if (!currentUser && !isFallbackDb) {
+      if (!currentUser) {
         setAuthError({
           type: "auth_required",
           message: "Authentication required",
@@ -56,10 +133,7 @@ export function AuthProvider({ children }) {
       setUser(null);
       setIsAuthenticated(false);
       setIsLoadingAuth(false);
-      setAuthError({
-        type: "auth_required",
-        message: error?.message || "Authentication required",
-      });
+      setAuthError(mapAuthError(error));
     }
   }
 
@@ -76,6 +150,10 @@ export function AuthProvider({ children }) {
   }
 
   function navigateToLogin() {
+    if (!canRedirectToLogin) {
+      return;
+    }
+
     db.auth.redirectToLogin?.(window.location.href);
   }
 
