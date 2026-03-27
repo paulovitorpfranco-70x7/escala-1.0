@@ -1,0 +1,29 @@
+{
+  "name": "Employee",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "title": "Nome"
+    },
+    "role": {
+      "type": "string",
+      "title": "Cargo",
+      "enum": [
+        "Farmac\u00eautico",
+        "Atendente",
+        "Gerente",
+        "Caixa",
+        "Outro"
+      ]
+    },
+    "active": {
+      "type": "boolean",
+      "title": "Ativo",
+      "default": true
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

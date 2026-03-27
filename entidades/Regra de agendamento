@@ -1,0 +1,26 @@
+{
+  "name": "ScheduleRule",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "title": "Colaborador ID"
+    },
+    "employee_name": {
+      "type": "string",
+      "title": "Nome Colaborador"
+    },
+    "rule_text": {
+      "type": "string",
+      "title": "Regra em Texto"
+    },
+    "active": {
+      "type": "boolean",
+      "title": "Ativa",
+      "default": true
+    }
+  },
+  "required": [
+    "rule_text"
+  ]
+}

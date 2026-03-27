@@ -1,0 +1,36 @@
+{
+  "name": "Schedule",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "title": "Colaborador ID"
+    },
+    "employee_name": {
+      "type": "string",
+      "title": "Nome Colaborador"
+    },
+    "month": {
+      "type": "number",
+      "title": "M\u00eas (1-12)"
+    },
+    "year": {
+      "type": "number",
+      "title": "Ano"
+    },
+    "days": {
+      "type": "object",
+      "title": "Dias do M\u00eas",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "employee_id",
+    "employee_name",
+    "month",
+    "year",
+    "days"
+  ]
+}
