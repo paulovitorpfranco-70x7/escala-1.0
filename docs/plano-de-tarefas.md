@@ -6,7 +6,7 @@ Transformar o Escala 1.0 em um produto utilizavel com fluxo principal confiavel,
 ## Fase 1: MVP
 Entregar o fluxo principal funcionando de ponta a ponta com previsibilidade para uso interno.
 
-- [ ] Validar a estrutura atual do frontend e alinhar nomes de pastas, arquivos e imports para uma convencao unica antes de evoluir funcionalidades.
+- [x] Validar a estrutura atual do frontend e alinhar nomes de pastas, arquivos e imports para uma convencao unica antes de evoluir funcionalidades.
 - [ ] Revisar a configuracao de autenticacao e garantir o comportamento de redirecionamento para login e tratamento de usuario nao registrado.
 - [ ] Mapear e documentar as entidades Employee, Schedule e ScheduleRule com seus campos obrigatorios, relacoes e restricoes operacionais.
 - [ ] Implementar validacoes de formulario no cadastro e edicao de colaboradores, incluindo obrigatoriedade de nome e tratamento de erros de persistencia.
