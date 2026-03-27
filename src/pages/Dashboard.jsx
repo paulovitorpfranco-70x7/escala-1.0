@@ -1,5 +1,4 @@
 // @ts-nocheck
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -9,74 +8,43 @@ import {
   Users,
 } from "lucide-react";
 
-import { db } from "@/API/base44Client";
 import { Button } from "@/components/ui/button";
 import PageState from "@/components/ui/page-state";
+import { useDashboardPage } from "@/hooks/useDashboardPage";
 import { getMonthName } from "@/lib/scheduleUtils";
 
 export default function Dashboard() {
-  const [employees, setEmployees] = useState([]);
-  const [schedules, setSchedules] = useState([]);
-  const [rules, setRules] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
-
-  const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
-
-  async function loadDashboard() {
-    setLoading(true);
-
-    try {
-      setLoadError("");
-      const [employeeList, scheduleList, ruleList] = await Promise.all([
-        db.entities.Employee.list(),
-        db.entities.Schedule.filter({
-          month: currentMonth,
-          year: currentYear,
-        }),
-        db.entities.ScheduleRule.list(),
-      ]);
-
-      setEmployees(employeeList);
-      setSchedules(scheduleList);
-      setRules(ruleList);
-    } catch (error) {
-      setLoadError(error?.message || "Nao foi possivel carregar o painel.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void loadDashboard();
-  }, [currentMonth, currentYear]);
-
-  const totalFolgas = schedules.reduce((sum, schedule) => {
-    return (
-      sum + Object.values(schedule.days || {}).filter((value) => value === "F").length
-    );
-  }, 0);
+  const {
+    currentMonth,
+    currentYear,
+    employeeCount,
+    scheduleCount,
+    activeRuleCount,
+    totalFolgas,
+    isEmpty,
+    loading,
+    loadError,
+    reloadDashboard,
+  } = useDashboardPage();
 
   const stats = [
     {
       label: "Colaboradores",
-      value: employees.length,
+      value: employeeCount,
       icon: Users,
       color: "bg-primary/10 text-primary",
       link: "/colaboradores",
     },
     {
       label: `Escalas ${getMonthName(currentMonth, currentYear)}`,
-      value: schedules.length,
+      value: scheduleCount,
       icon: Calendar,
       color: "bg-accent/10 text-accent",
       link: "/escala",
     },
     {
       label: "Regras ativas",
-      value: rules.filter((rule) => rule.active).length,
+      value: activeRuleCount,
       icon: MessageSquare,
       color: "bg-purple-100 text-purple-700",
       link: "/comandos",
@@ -89,8 +57,6 @@ export default function Dashboard() {
       link: "/escala",
     },
   ];
-  const isEmpty =
-    employees.length === 0 && schedules.length === 0 && rules.length === 0;
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -114,7 +80,7 @@ export default function Dashboard() {
           action={
             <Button
               onClick={() => {
-                void loadDashboard();
+                void reloadDashboard();
               }}
             >
               Tentar novamente

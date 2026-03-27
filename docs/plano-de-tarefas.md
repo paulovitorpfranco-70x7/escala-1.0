@@ -18,8 +18,8 @@ Entregar o fluxo principal funcionando de ponta a ponta com previsibilidade para
 ## Fase 2: Estabilizacao
 Reduzir acoplamento, melhorar manutencao e criar seguranca para evolucao do sistema.
 
-- [ ] Refatorar a camada de acesso a dados para centralizar chamadas Base44 em services ou hooks dedicados.
-- [ ] Refatorar as paginas para separar UI de logica de negocio, extraindo hooks para dashboard, colaboradores, escala e comandos.
+- [x] Refatorar a camada de acesso a dados para centralizar chamadas Base44 em services ou hooks dedicados.
+- [x] Refatorar as paginas para separar UI de logica de negocio, extraindo hooks para dashboard, colaboradores, escala e comandos.
 - [ ] Definir uma estrutura de pastas mais clara para pages, components, hooks, services e lib conforme a arquitetura sugerida.
 - [ ] Revisar o componente de exportacao para garantir captura correta da grade, nomeacao padrao do arquivo e comportamento estavel em telas menores.
 - [ ] Criar testes unitarios para utilitarios de agenda, incluindo calculo de dias do mes, finais de semana, contagem de turnos e geracao da escala vazia.
