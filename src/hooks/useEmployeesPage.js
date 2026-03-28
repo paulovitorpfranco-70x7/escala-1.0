@@ -3,57 +3,18 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useToast } from "@/components/ui/use-toast";
 import {
+  DEFAULT_ROLE,
+  deleteEmployeeFlow,
+  EMPLOYEE_ROLES,
+  saveEmployeeFlow,
+  validateEmployeeForm,
+} from "@/lib/employeeFlow";
+import {
   createEmployee,
   deleteEmployee,
   listEmployees,
   updateEmployee,
 } from "@/services/employeeService";
-
-const DEFAULT_ROLE = "Atendente";
-const MIN_NAME_LENGTH = 3;
-const roles = [
-  "Farmac\u00eautico",
-  "Atendente",
-  "Gerente",
-  "Caixa",
-  "Outro",
-];
-
-function normalizeEmployeeName(value) {
-  return value.trim().replace(/\s+/g, " ").toUpperCase();
-}
-
-function validateEmployeeForm(form, employees, editingEmployee) {
-  const errors = {};
-  const normalizedName = normalizeEmployeeName(form.name);
-
-  if (!normalizedName) {
-    errors.name = "Informe o nome do colaborador.";
-  } else if (normalizedName.length < MIN_NAME_LENGTH) {
-    errors.name = `O nome deve ter pelo menos ${MIN_NAME_LENGTH} caracteres.`;
-  } else {
-    const duplicate = employees.some((employee) => {
-      if (editingEmployee?.id && employee.id === editingEmployee.id) {
-        return false;
-      }
-
-      return normalizeEmployeeName(employee.name || "") === normalizedName;
-    });
-
-    if (duplicate) {
-      errors.name = "Ja existe um colaborador com esse nome.";
-    }
-  }
-
-  if (!roles.includes(form.role)) {
-    errors.role = "Selecione um cargo valido.";
-  }
-
-  return {
-    errors,
-    normalizedName,
-  };
-}
 
 export function useEmployeesPage() {
   const [employees, setEmployees] = useState([]);
@@ -67,6 +28,12 @@ export function useEmployeesPage() {
   const [submitError, setSubmitError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const employeeServices = {
+    createEmployee,
+    deleteEmployee,
+    listEmployees,
+    updateEmployee,
+  };
 
   const validation = useMemo(
     () => validateEmployeeForm(form, employees, editingEmployee),
@@ -164,21 +131,25 @@ export function useEmployeesPage() {
     setIsSaving(true);
 
     try {
-      const payload = {
-        name: validation.normalizedName,
-        role: form.role,
-      };
+      const result = await saveEmployeeFlow({
+        form,
+        employees,
+        editingEmployee,
+        services: employeeServices,
+      });
 
-      if (editingEmployee) {
-        await updateEmployee(editingEmployee.id, payload);
-        toast({ title: "Colaborador atualizado" });
-      } else {
-        await createEmployee({ ...payload, active: true });
-        toast({ title: "Colaborador adicionado" });
+      if (!result.ok) {
+        return;
       }
 
+      setEmployees(result.employees);
       closeDialog();
-      await loadEmployees({ showLoading: false });
+      toast({
+        title:
+          result.action === "updated"
+            ? "Colaborador atualizado"
+            : "Colaborador adicionado",
+      });
     } catch (error) {
       const message =
         error?.message || "Nao foi possivel salvar o colaborador.";
@@ -195,14 +166,20 @@ export function useEmployeesPage() {
   }
 
   async function handleDelete(employee) {
-    if (!window.confirm(`Remover ${employee.name}?`)) {
-      return;
-    }
-
     try {
-      await deleteEmployee(employee.id);
+      const result = await deleteEmployeeFlow({
+        employee,
+        services: employeeServices,
+        confirmDelete: (currentEmployee) =>
+          window.confirm(`Remover ${currentEmployee.name}?`),
+      });
+
+      if (!result.ok) {
+        return;
+      }
+
+      setEmployees(result.employees);
       toast({ title: "Colaborador removido" });
-      await loadEmployees({ showLoading: false });
     } catch (error) {
       toast({
         title: "Erro ao remover",
@@ -219,7 +196,7 @@ export function useEmployeesPage() {
     dialogOpen,
     editingEmployee,
     form,
-    roles,
+    roles: EMPLOYEE_ROLES,
     nameError,
     roleError,
     submitError,

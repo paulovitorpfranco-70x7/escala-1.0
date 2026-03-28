@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info } from "lucide-react";
 
 import { useToast } from "@/components/ui/use-toast";
-import { getDaysInMonth, getMonthName, isValidShift, normalizeScheduleDays } from "@/lib/scheduleUtils";
+import { applyCommandFlow, deleteRuleFlow } from "@/lib/commandFlow";
+import { getMonthName } from "@/lib/scheduleUtils";
 import { listEmployees } from "@/services/employeeService";
 import { invokeLlm } from "@/services/llmService";
 import {
@@ -13,204 +14,16 @@ import {
 } from "@/services/scheduleRuleService";
 import { listSchedulesByPeriod, updateScheduleDays } from "@/services/scheduleService";
 
-const MIN_COMMAND_LENGTH = 8;
-
-function normalizeCommandText(value) {
-  return value.trim().replace(/\s+/g, " ");
-}
-
-function isPlainObject(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function validateCommandInput(commandText, employees, schedules) {
-  if (!commandText) {
-    return "Escreva um comando antes de enviar.";
+function getOutcomeIcon(tone) {
+  if (tone === "success") {
+    return CheckCircle2;
   }
 
-  if (commandText.length < MIN_COMMAND_LENGTH) {
-    return `O comando precisa ter pelo menos ${MIN_COMMAND_LENGTH} caracteres.`;
+  if (tone === "warning") {
+    return AlertTriangle;
   }
 
-  if (employees.length === 0) {
-    return "Nao ha colaboradores cadastrados para interpretar o comando.";
-  }
-
-  if (schedules.length === 0) {
-    return "Gere a escala do periodo antes de aplicar comandos de IA.";
-  }
-
-  return null;
-}
-
-function validateLlmPayload(result) {
-  if (!isPlainObject(result)) {
-    return "A IA retornou uma resposta em formato invalido.";
-  }
-
-  if (result.error && typeof result.error === "string") {
-    return result.error;
-  }
-
-  if (result.changes !== undefined && !Array.isArray(result.changes)) {
-    return "A IA retornou alteracoes em formato invalido.";
-  }
-
-  if (
-    result.explanation !== undefined &&
-    typeof result.explanation !== "string"
-  ) {
-    return "A IA retornou uma explicacao em formato invalido.";
-  }
-
-  return null;
-}
-
-function collectApplicableChanges(changes, schedules, month, year) {
-  const totalDays = getDaysInMonth(month, year);
-  const schedulesById = new Map(
-    schedules.filter((schedule) => schedule?.id).map((schedule) => [schedule.id, schedule])
-  );
-
-  const applicableChanges = [];
-  const summary = {
-    invalidEntries: 0,
-    unknownSchedules: 0,
-    invalidDays: 0,
-    invalidShifts: 0,
-    emptyChanges: 0,
-  };
-
-  for (const change of changes || []) {
-    if (!isPlainObject(change) || typeof change.schedule_id !== "string") {
-      summary.invalidEntries += 1;
-      continue;
-    }
-
-    const schedule = schedulesById.get(change.schedule_id);
-    if (!schedule) {
-      summary.unknownSchedules += 1;
-      continue;
-    }
-
-    if (!isPlainObject(change.day_changes)) {
-      summary.invalidEntries += 1;
-      continue;
-    }
-
-    const normalizedDays = normalizeScheduleDays(schedule.days, month, year);
-    const validDayChanges = {};
-
-    for (const [rawDay, rawShift] of Object.entries(change.day_changes)) {
-      const day = Number(rawDay);
-
-      if (!Number.isInteger(day) || day < 1 || day > totalDays) {
-        summary.invalidDays += 1;
-        continue;
-      }
-
-      if (!isValidShift(rawShift)) {
-        summary.invalidShifts += 1;
-        continue;
-      }
-
-      validDayChanges[String(day)] = rawShift;
-    }
-
-    if (Object.keys(validDayChanges).length === 0) {
-      summary.emptyChanges += 1;
-      continue;
-    }
-
-    applicableChanges.push({
-      schedule,
-      employeeName: change.employee_name || schedule.employee_name,
-      scheduleId: change.schedule_id,
-      newDays: { ...normalizedDays, ...validDayChanges },
-      validDayChanges,
-    });
-  }
-
-  return {
-    applicableChanges,
-    summary,
-  };
-}
-
-function buildOutcomeMessage({
-  appliedSchedules,
-  appliedDays,
-  failedUpdates,
-  explanation,
-  summary,
-}) {
-  const details = [];
-
-  if (explanation) {
-    details.push(explanation);
-  }
-
-  if (appliedSchedules > 0) {
-    details.push(
-      `${appliedSchedules} escala(s) atualizada(s) com ${appliedDays} alteracao(oes) de dia.`
-    );
-  }
-
-  if (summary.unknownSchedules > 0) {
-    details.push(
-      `${summary.unknownSchedules} alteracao(oes) foram ignoradas por apontarem para escalas inexistentes.`
-    );
-  }
-
-  if (summary.invalidDays > 0) {
-    details.push(
-      `${summary.invalidDays} dia(s) invalido(s) foram descartados na resposta da IA.`
-    );
-  }
-
-  if (summary.invalidShifts > 0) {
-    details.push(
-      `${summary.invalidShifts} turno(s) invalido(s) foram descartados na resposta da IA.`
-    );
-  }
-
-  if (summary.invalidEntries > 0 || summary.emptyChanges > 0) {
-    details.push(
-      `${summary.invalidEntries + summary.emptyChanges} bloco(s) de alteracao nao puderam ser aproveitados.`
-    );
-  }
-
-  if (failedUpdates > 0) {
-    details.push(
-      `${failedUpdates} atualizacao(oes) falharam durante a persistencia.`
-    );
-  }
-
-  return details.join(" ");
-}
-
-function getOutcomeState(appliedSchedules, failedUpdates) {
-  if (appliedSchedules > 0 && failedUpdates === 0) {
-    return {
-      icon: CheckCircle2,
-      tone: "success",
-      title: "Comando aplicado",
-    };
-  }
-
-  if (appliedSchedules > 0 || failedUpdates > 0) {
-    return {
-      icon: AlertTriangle,
-      tone: "warning",
-      title: "Comando aplicado com ressalvas",
-    };
-  }
-
-  return {
-    icon: Info,
-    tone: "neutral",
-    title: "Nenhuma alteracao aplicada",
-  };
+  return Info;
 }
 
 export function useCommandsPage() {
@@ -228,6 +41,14 @@ export function useCommandsPage() {
   const [lastOutcome, setLastOutcome] = useState(null);
   const [loadError, setLoadError] = useState("");
   const { toast } = useToast();
+  const commandServices = {
+    createScheduleRule,
+    deleteScheduleRule,
+    invokeLlm,
+    listScheduleRules,
+    listSchedulesByPeriod,
+    updateScheduleDays,
+  };
 
   async function loadCommandsPage() {
     setLoading(true);
@@ -256,25 +77,6 @@ export function useCommandsPage() {
     void loadCommandsPage();
   }, [month, year]);
 
-  async function reloadRulesAndSchedules() {
-    try {
-      const [ruleList, scheduleList] = await Promise.all([
-        listScheduleRules("-created_date", 20),
-        listSchedulesByPeriod({ month, year }),
-      ]);
-
-      setRules(ruleList);
-      setSchedules(scheduleList);
-    } catch (error) {
-      toast({
-        title: "Falha ao atualizar a pagina",
-        description:
-          error?.message || "Nao foi possivel recarregar regras e escalas.",
-        variant: "destructive",
-      });
-    }
-  }
-
   function handleCommandChange(value) {
     setCommand(value);
     setCommandError("");
@@ -286,154 +88,51 @@ export function useCommandsPage() {
   }
 
   async function handleSend() {
-    const normalizedCommand = normalizeCommandText(command);
-    const inputError = validateCommandInput(
-      normalizedCommand,
-      employees,
-      schedules
-    );
-
-    if (inputError) {
-      setCommandError(inputError);
-      setLastOutcome(null);
-      toast({
-        title: "Comando invalido",
-        description: inputError,
-        variant: "destructive",
-      });
-      return;
-    }
-
     setProcessing(true);
     setCommandError("");
     setLastOutcome(null);
 
     try {
-      const employeeNames = employees
-        .map((employee) => `${employee.name} (id: ${employee.id})`)
-        .join(", ");
-
-      const scheduleInfo = schedules
-        .map(
-          (schedule) =>
-            `${schedule.employee_name} (schedule_id: ${schedule.id}): ${JSON.stringify(
-              normalizeScheduleDays(schedule.days, month, year)
-            )}`
-        )
-        .join("\n");
-
-      const prompt = `Voce e um assistente de escalas de trabalho. O mes e ${getMonthName(
+      const result = await applyCommandFlow({
+        command,
+        employees,
+        schedules,
         month,
-        year
-      )} ${year} com ${getDaysInMonth(month, year)} dias.
-
-Colaboradores: ${employeeNames}
-
-Escalas atuais:
-${scheduleInfo || "Nenhuma escala gerada ainda."}
-
-O usuario enviou o seguinte comando:
-"${normalizedCommand}"
-
-Analise o comando e retorne apenas modificacoes validas para as escalas existentes.
-Use "T" para Trabalho, "F" para Folga e "M" para Madrugada.
-
-Regras importantes:
-- Domingo e dia 0
-- "Ultimo domingo do mes" significa o ultimo dia do mes que cai em domingo
-- "Toda quarta" significa todos os dias que sao quarta-feira no mes
-- Nunca invente schedule_id
-- Nunca altere dias fora do mes informado
-- Se o colaborador nao tem escala ainda, nao modifique
-
-Retorne um JSON com as modificacoes.`;
-
-      const result = await invokeLlm({
-        prompt,
-        responseJsonSchema: {
-          type: "object",
-          properties: {
-            changes: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  schedule_id: { type: "string" },
-                  employee_name: { type: "string" },
-                  day_changes: {
-                    type: "object",
-                    additionalProperties: { type: "string" },
-                  },
-                },
-              },
-            },
-            explanation: { type: "string" },
-            error: { type: "string" },
-          },
-        },
+        year,
+        services: commandServices,
       });
 
-      const payloadError = validateLlmPayload(result);
-      if (payloadError) {
-        setCommandError(payloadError);
-        setLastOutcome(null);
+      if (!result.ok) {
+        setCommandError(result.error);
         toast({
-          title: "Erro no processamento da IA",
-          description: payloadError,
+          title:
+            result.errorPhase === "llm"
+              ? "Erro no processamento da IA"
+              : "Comando invalido",
+          description: result.error,
           variant: "destructive",
         });
         return;
       }
 
-      const { applicableChanges, summary } = collectApplicableChanges(
-        result.changes || [],
-        schedules,
-        month,
-        year
-      );
-
-      let appliedSchedules = 0;
-      let appliedDays = 0;
-      let failedUpdates = 0;
-
-      for (const change of applicableChanges) {
-        try {
-          await updateScheduleDays(change.scheduleId, change.newDays);
-          appliedSchedules += 1;
-          appliedDays += Object.keys(change.validDayChanges).length;
-        } catch {
-          failedUpdates += 1;
-        }
-      }
-
-      const outcomeState = getOutcomeState(appliedSchedules, failedUpdates);
-      const outcomeMessage = buildOutcomeMessage({
-        appliedSchedules,
-        appliedDays,
-        failedUpdates,
-        explanation: result.explanation,
-        summary,
-      });
+      const outcomeDescription =
+        result.outcomeMessage ||
+        "A IA nao retornou alteracoes aplicaveis para o periodo.";
+      const outcomeState = {
+        ...result.outcomeState,
+        icon: getOutcomeIcon(result.outcomeState.tone),
+      };
 
       setLastOutcome({
         ...outcomeState,
-        description:
-          outcomeMessage || "A IA nao retornou alteracoes aplicaveis para o periodo.",
+        description: outcomeDescription,
       });
-
-      if (appliedSchedules > 0) {
-        await createScheduleRule({
-          rule_text: normalizedCommand,
-          active: true,
-          employee_name: applicableChanges[0]?.employeeName || "Geral",
-        });
-      }
-
+      setRules(result.rules);
+      setSchedules(result.schedules);
       setHistory((current) => [
         {
-          command: normalizedCommand,
-          result:
-            outcomeMessage || "A IA nao retornou alteracoes aplicaveis para o periodo.",
+          command: result.normalizedCommand,
+          result: outcomeDescription,
           status: outcomeState.title,
           time: new Date().toLocaleTimeString("pt-BR"),
         },
@@ -442,18 +141,13 @@ Retorne um JSON com as modificacoes.`;
 
       toast({
         title: outcomeState.title,
-        description:
-          outcomeMessage || "A IA nao retornou alteracoes aplicaveis para o periodo.",
-        variant: failedUpdates > 0 ? "destructive" : undefined,
+        description: outcomeDescription,
+        variant: result.failedUpdates > 0 ? "destructive" : undefined,
       });
 
-      if (appliedSchedules > 0) {
+      if (result.appliedSchedules > 0) {
         setCommand("");
-        await reloadRulesAndSchedules();
-        return;
       }
-
-      await reloadRulesAndSchedules();
     } catch (error) {
       const message =
         error?.message || "Nao foi possivel processar o comando.";
@@ -472,8 +166,11 @@ Retorne um JSON com as modificacoes.`;
 
   async function handleDeleteRule(rule) {
     try {
-      await deleteScheduleRule(rule.id);
-      setRules((current) => current.filter((item) => item.id !== rule.id));
+      const result = await deleteRuleFlow({
+        rule,
+        services: commandServices,
+      });
+      setRules(result.rules);
       toast({ title: "Regra removida" });
     } catch (error) {
       toast({

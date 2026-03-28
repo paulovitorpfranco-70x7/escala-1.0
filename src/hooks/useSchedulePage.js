@@ -3,12 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useToast } from "@/components/ui/use-toast";
 import {
-  generateEmptySchedule,
-  getMonthName,
-  getNextShift,
-  normalizeScheduleDays,
-  validateScheduleDayChange,
-} from "@/lib/scheduleUtils";
+  analyzeSchedulesForMonth,
+  generateSchedulesForPeriod,
+  prepareScheduleDayUpdate,
+} from "@/lib/scheduleFlow";
+import { getMonthName } from "@/lib/scheduleUtils";
 import { listActiveEmployees } from "@/services/employeeService";
 import {
   createSchedule,
@@ -17,66 +16,6 @@ import {
   updateSchedule,
   updateScheduleDays,
 } from "@/services/scheduleService";
-
-function buildSchedulePayload(employee, month, year) {
-  return {
-    employee_id: employee.id,
-    employee_name: employee.name,
-    month,
-    year,
-    days: generateEmptySchedule(month, year),
-  };
-}
-
-function getScheduleSnapshot(schedule) {
-  return {
-    employee_id: schedule.employee_id,
-    employee_name: schedule.employee_name,
-    month: schedule.month,
-    year: schedule.year,
-    days: { ...(schedule.days || {}) },
-  };
-}
-
-function dedupeSchedulesForCleanup(schedules) {
-  const seen = new Set();
-
-  return schedules.filter((schedule) => {
-    if (!schedule?.id || seen.has(schedule.id)) {
-      return false;
-    }
-
-    seen.add(schedule.id);
-    return true;
-  });
-}
-
-function analyzeSchedulesForMonth(schedules, activeEmployees) {
-  const activeEmployeeIds = new Set(activeEmployees.map((employee) => employee.id));
-  const primaryByEmployeeId = new Map();
-  const duplicates = [];
-  const stale = [];
-
-  for (const schedule of schedules) {
-    if (!schedule.employee_id || !activeEmployeeIds.has(schedule.employee_id)) {
-      stale.push(schedule);
-      continue;
-    }
-
-    if (primaryByEmployeeId.has(schedule.employee_id)) {
-      duplicates.push(schedule);
-      continue;
-    }
-
-    primaryByEmployeeId.set(schedule.employee_id, schedule);
-  }
-
-  return {
-    primaryByEmployeeId,
-    duplicates,
-    stale,
-  };
-}
 
 export function useSchedulePage() {
   const now = new Date();
@@ -89,6 +28,12 @@ export function useSchedulePage() {
   const [generating, setGenerating] = useState(false);
   const [pendingCellUpdates, setPendingCellUpdates] = useState({});
   const { toast } = useToast();
+  const scheduleServices = {
+    createSchedule,
+    deleteSchedule,
+    updateSchedule,
+    updateScheduleDays,
+  };
 
   const monthAnalysis = useMemo(
     () => analyzeSchedulesForMonth(schedules, employees),
@@ -124,32 +69,7 @@ export function useSchedulePage() {
     void loadSchedulePage();
   }, [month, year]);
 
-  async function rollbackScheduleChanges(createdScheduleIds, updatedSchedules) {
-    for (const scheduleId of createdScheduleIds) {
-      if (!scheduleId) {
-        continue;
-      }
-
-      try {
-        await deleteSchedule(scheduleId);
-      } catch {
-        // Best-effort rollback for partial create failures.
-      }
-    }
-
-    for (const schedule of updatedSchedules.reverse()) {
-      try {
-        await updateSchedule(schedule.id, schedule.snapshot);
-      } catch {
-        // Best-effort rollback for partial update failures.
-      }
-    }
-  }
-
   async function handleGenerate() {
-    const createdScheduleIds = [];
-    const updatedSchedules = [];
-
     if (employees.length === 0) {
       toast({
         title: "Adicione colaboradores primeiro",
@@ -178,8 +98,15 @@ export function useSchedulePage() {
         listSchedulesByPeriod({ month, year }),
         listActiveEmployees(),
       ]);
+      const result = await generateSchedulesForPeriod({
+        month,
+        year,
+        currentSchedules,
+        activeEmployees,
+        services: scheduleServices,
+      });
 
-      if (activeEmployees.length === 0) {
+      if (result.kind === "no-employees") {
         toast({
           title: "Nenhum colaborador ativo",
           description: "Nao ha colaboradores ativos para gerar a escala.",
@@ -188,48 +115,14 @@ export function useSchedulePage() {
         return;
       }
 
-      const analysis = analyzeSchedulesForMonth(currentSchedules, activeEmployees);
-      const cleanupTargets = dedupeSchedulesForCleanup([
-        ...analysis.duplicates,
-        ...analysis.stale,
-      ]);
-
-      for (const employee of activeEmployees) {
-        const existingSchedule = analysis.primaryByEmployeeId.get(employee.id);
-        const nextPayload = buildSchedulePayload(employee, month, year);
-
-        if (existingSchedule) {
-          updatedSchedules.push({
-            id: existingSchedule.id,
-            snapshot: getScheduleSnapshot(existingSchedule),
-          });
-
-          await updateSchedule(existingSchedule.id, nextPayload);
-          continue;
-        }
-
-        const createdSchedule = await createSchedule(nextPayload);
-        createdScheduleIds.push(createdSchedule?.id || null);
-      }
-
-      let cleanupFailures = 0;
-
-      for (const schedule of cleanupTargets) {
-        try {
-          await deleteSchedule(schedule.id);
-        } catch {
-          cleanupFailures += 1;
-        }
-      }
-
-      if (cleanupFailures > 0) {
+      if (result.cleanupFailures > 0) {
         toast({
           title: "Escala regenerada com ressalvas",
           description:
             "Os turnos foram recriados, mas alguns registros antigos nao puderam ser limpos.",
           variant: "destructive",
         });
-      } else if (currentSchedules.length > 0) {
+      } else if (result.kind === "regenerated") {
         toast({
           title: "Escala regenerada com sucesso",
           description: "O periodo foi resetado sem duplicar registros.",
@@ -243,8 +136,6 @@ export function useSchedulePage() {
 
       await loadSchedulePage({ showLoading: false });
     } catch (error) {
-      await rollbackScheduleChanges(createdScheduleIds, updatedSchedules);
-
       toast({
         title: "Falha ao gerar escala",
         description:
@@ -260,12 +151,12 @@ export function useSchedulePage() {
   }
 
   async function handleCellClick(schedule, day) {
-    const validationError = validateScheduleDayChange(schedule, day, month, year);
+    const prepared = prepareScheduleDayUpdate({ schedule, day, month, year });
 
-    if (validationError) {
+    if (prepared.error) {
       toast({
         title: "Edicao invalida",
-        description: validationError,
+        description: prepared.error,
         variant: "destructive",
       });
       return;
@@ -276,24 +167,21 @@ export function useSchedulePage() {
       return;
     }
 
-    const normalizedDays = normalizeScheduleDays(schedule.days, month, year);
-    const currentShift = normalizedDays[String(day)];
-    const nextShift = getNextShift(currentShift);
-    const newDays = { ...normalizedDays, [String(day)]: nextShift };
-
     setPendingCellUpdates((current) => ({ ...current, [cellKey]: true }));
     setSchedules((current) =>
       current.map((item) =>
-        item.id === schedule.id ? { ...item, days: newDays } : item
+        item.id === schedule.id ? { ...item, days: prepared.newDays } : item
       )
     );
 
     try {
-      await updateScheduleDays(schedule.id, newDays);
+      await updateScheduleDays(schedule.id, prepared.newDays);
     } catch (error) {
       setSchedules((current) =>
         current.map((item) =>
-          item.id === schedule.id ? { ...item, days: normalizedDays } : item
+          item.id === schedule.id
+            ? { ...item, days: prepared.normalizedDays }
+            : item
         )
       );
       toast({

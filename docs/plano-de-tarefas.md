@@ -23,7 +23,7 @@ Reduzir acoplamento, melhorar manutencao e criar seguranca para evolucao do sist
 - [x] Definir uma estrutura de pastas mais clara para pages, components, hooks, services e lib conforme a arquitetura sugerida.
 - [x] Revisar o componente de exportacao para garantir captura correta da grade, nomeacao padrao do arquivo e comportamento estavel em telas menores.
 - [x] Criar testes unitarios para utilitarios de agenda, incluindo calculo de dias do mes, finais de semana, contagem de turnos e geracao da escala vazia.
-- [ ] Criar testes de integracao para os fluxos principais: colaboradores, geracao da escala, edicao manual, comandos IA e exclusao de regras.
+- [x] Criar testes de integracao para os fluxos principais: colaboradores, geracao da escala, edicao manual, comandos IA e exclusao de regras.
 - [ ] Atualizar a documentacao tecnica com fluxo de dados, convencoes do projeto, requisitos e criterios de aceite por funcionalidade.
 - [ ] Preparar um checklist de release com lint, typecheck, testes e validacoes manuais do fluxo principal.
 
