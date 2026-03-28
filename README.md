@@ -1,41 +1,57 @@
-const db = globalThis.__B44_DB__ || { auth:{ isAuthenticated: async()=>false, me: async()=>null }, entities:new Proxy({}, { get:()=>({ filter:async()=>[], get:async()=>null, create:async()=>({}), update:async()=>({}), delete:async()=>({}) }) }), integrations:{ Core:{ UploadFile:async()=>({ file_url:'' }) } } };
+# Escala 1.0
 
-**Welcome to your Base44 project** 
+Aplicacao web para gestao de escalas mensais com dashboard, CRUD de colaboradores, geracao de escala por periodo, edicao manual de turnos, comandos em linguagem natural com IA e exportacao da grade em imagem.
 
-**About**
+## Stack
+- React 18
+- Vite
+- Tailwind CSS
+- Base44 SDK
+- Node test runner para testes unitarios e de integracao
 
-View and Edit  your app on [db.com](http://db.com) 
+## Como executar localmente
+1. Instale as dependencias com `npm install`.
+2. Crie um arquivo `.env.local` na raiz do projeto.
+3. Configure as variaveis de ambiente necessarias.
+4. Inicie a aplicacao com `npm run dev`.
 
-This project contains everything you need to run your app locally.
-
-**Edit the code in your local development environment**
-
-Any change pushed to the repo will also be reflected in the Base44 Builder.
-
-**Prerequisites:** 
-
-1. Clone the repository using the project's Git URL 
-2. Navigate to the project directory
-3. Install dependencies: `npm install`
-4. Create an `.env.local` file and set the right environment variables
-
-```
-VITE_BASE44_APP_ID=your_app_id
-VITE_BASE44_APP_BASE_URL=your_backend_url
-
-e.g.
-VITE_BASE44_APP_ID=cbef744a8545c389ef439ea6
-VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.db.app
+### Variaveis de ambiente
+```env
+VITE_BASE44_APP_ID=seu_app_id
+VITE_BASE44_APP_BASE_URL=https://seu-app.base44.app
+VITE_BASE44_FUNCTIONS_VERSION=opcional
 ```
 
-Run the app: `npm run dev`
+### Modos locais suportados
+- Modo Base44: com `VITE_BASE44_APP_ID` configurado, a aplicacao usa entidades reais, autenticacao e integracao de IA da Base44.
+- Modo fallback: sem `VITE_BASE44_APP_ID`, o cliente usa um banco local de fallback que retorna listas vazias, nao exige autenticacao e responde a IA com uma mensagem stub. Esse modo serve para layout e navegacao, nao para validar o fluxo real.
 
-**Publish your changes**
+## Scripts
+- `npm run dev`: sobe o servidor local do Vite.
+- `npm run build`: gera a build de producao.
+- `npm run preview`: publica a build localmente para inspecao.
+- `npm run lint`: executa o ESLint em modo silencioso.
+- `npm run lint:fix`: corrige problemas de lint suportados automaticamente.
+- `npm run typecheck`: executa `tsc -p ./jsconfig.json`.
+- `npm run test:unit`: roda os testes de utilitarios de agenda.
+- `npm run test:integration`: roda os testes dos fluxos principais de negocio.
 
-Open [db.com](http://db.com) and click on Publish.
+## Estrutura relevante
+- `src/`: codigo ativo da aplicacao.
+- `tests/`: testes unitarios e de integracao do dominio.
+- `docs/`: documentacao tecnica e operacional.
+- `entidades/`: definicoes de entidades herdadas da Base44.
 
-**Docs & Support**
+Detalhes adicionais:
+- `docs/fluxo-de-dados.md`: fluxo de dados e responsabilidades por camada.
+- `docs/criterios-de-aceite.md`: criterios de aceite por funcionalidade.
+- `docs/estrutura-de-pastas.md`: estrutura canonica e diretorios legados.
+- `docs/release-checklist.md`: roteiro de validacao antes de release.
+- `docs/modelo-de-entidades.md`: modelo atual de `Employee`, `Schedule` e `ScheduleRule`.
 
-Documentation: [https://docs.db.com/Integrations/Using-GitHub](https://docs.db.com/Integrations/Using-GitHub)
-
-Support: [https://app.db.com/support](https://app.db.com/support)
+## Limitacoes conhecidas
+- A autenticacao depende da configuracao Base44 e do token salvo em URL/localStorage; no modo fallback nao ha redirecionamento real para login.
+- As regras salvas funcionam hoje como historico de comandos; excluir uma regra nao desfaz alteracoes ja aplicadas na escala.
+- A tela de comandos opera apenas sobre o periodo corrente carregado na sessao.
+- O projeto ainda mantem diretorios legados em portugues fora da estrutura canonica; eles nao devem receber novas alteracoes.
+- O `QueryClientProvider` ja existe, mas o carregamento principal de paginas ainda usa `useEffect` e estado local.

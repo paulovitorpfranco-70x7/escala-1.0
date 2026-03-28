@@ -16,6 +16,12 @@ src/
   services/    acesso a dados e integracoes encapsuladas
 ```
 
+Arquivos e diretorios de apoio ao codigo ativo:
+
+- `tests/`: testes unitarios e de integracao do dominio.
+- `docs/`: documentacao tecnica, operacional e de release.
+- `entidades/`: referencias herdadas da modelagem Base44.
+
 ## Regras de organizacao
 
 - `pages` deve conter composicao de UI e delegar estado, efeitos e handlers para `hooks`.
@@ -36,3 +42,11 @@ Os diretorios abaixo permanecem no repositorio apenas como legado e nao devem re
 - `src/utilitarios` (corresponde a pasta legada com acento no filesystem)
 
 Esses caminhos estao fora da estrutura canonica e foram excluidos do escopo principal de validacao para nao competir com a aplicacao ativa.
+
+## Fora do escopo do codigo fonte
+
+- `dist/`: artefatos de build gerados localmente.
+- `node_modules/`: dependencias instaladas.
+- `.git/`: metadados de versionamento.
+
+Nenhum desenvolvimento novo deve ser iniciado nesses diretorios.
