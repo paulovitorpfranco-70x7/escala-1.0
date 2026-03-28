@@ -145,23 +145,21 @@ export default function Schedule() {
             </div>
           </div>
 
-          <div ref={gridRef}>
-            <div className="rounded-xl bg-white p-4">
-              <div className="mb-4 text-center">
-                <h2 className="font-heading text-lg font-bold text-foreground">
-                  ESCALA DE REVEZAMENTO - {getMonthName(month, year).toUpperCase()}{" "}
-                  {year}
-                </h2>
-              </div>
-              <ScheduleGrid
-                isCellPending={isCellPending}
-                month={month}
-                onCellClick={handleCellClick}
-                readonly={generating}
-                schedules={schedules}
-                year={year}
-              />
+          <div className="rounded-xl bg-white p-4" data-export-root ref={gridRef}>
+            <div className="mb-4 text-center">
+              <h2 className="font-heading text-lg font-bold text-foreground">
+                ESCALA DE REVEZAMENTO - {getMonthName(month, year).toUpperCase()}{" "}
+                {year}
+              </h2>
             </div>
+            <ScheduleGrid
+              isCellPending={isCellPending}
+              month={month}
+              onCellClick={handleCellClick}
+              readonly={generating}
+              schedules={schedules}
+              year={year}
+            />
           </div>
         </>
       )}

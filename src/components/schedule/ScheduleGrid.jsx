@@ -18,11 +18,17 @@ export default function ScheduleGrid({
   const days = Array.from({ length: totalDays }, (_, index) => index + 1);
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
-      <table className="w-full text-xs">
+    <div
+      className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm"
+      data-export-scroll
+    >
+      <table className="w-full text-xs" data-export-table>
         <thead>
           <tr className="bg-primary/5">
-            <th className="sticky left-0 z-10 min-w-[140px] bg-primary/5 px-4 py-3 text-left font-heading font-semibold text-foreground">
+            <th
+              className="sticky left-0 z-10 min-w-[140px] bg-primary/5 px-4 py-3 text-left font-heading font-semibold text-foreground"
+              data-export-sticky
+            >
               Colaborador
             </th>
             {days.map((day) => {
@@ -49,7 +55,10 @@ export default function ScheduleGrid({
                 </th>
               );
             })}
-            <th className="sticky right-0 z-10 min-w-[60px] bg-primary/5 px-3 py-3 text-center font-heading font-semibold text-foreground">
+            <th
+              className="sticky right-0 z-10 min-w-[60px] bg-primary/5 px-3 py-3 text-center font-heading font-semibold text-foreground"
+              data-export-sticky
+            >
               Folgas
             </th>
           </tr>
@@ -60,7 +69,10 @@ export default function ScheduleGrid({
               key={schedule.id || index}
               className="border-t border-border/50 transition-colors hover:bg-muted/30"
             >
-              <td className="sticky left-0 z-10 whitespace-nowrap bg-card px-4 py-2 text-sm font-semibold text-foreground">
+              <td
+                className="sticky left-0 z-10 whitespace-nowrap bg-card px-4 py-2 text-sm font-semibold text-foreground"
+                data-export-sticky
+              >
                 {schedule.employee_name}
               </td>
               {days.map((day) => {
@@ -87,7 +99,10 @@ export default function ScheduleGrid({
                   </td>
                 );
               })}
-              <td className="sticky right-0 z-10 bg-card px-3 py-2 text-center">
+              <td
+                className="sticky right-0 z-10 bg-card px-3 py-2 text-center"
+                data-export-sticky
+              >
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-accent/10 text-sm font-bold text-accent">
                   {countShifts(schedule.days, "F")}
                 </span>
